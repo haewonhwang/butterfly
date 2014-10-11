@@ -1,0 +1,143 @@
+/** TIME SPENT: # hours and # minutes. */ 
+//efficiency and a6 challenge?
+package student;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import danaus.*;
+
+public class Butterfly extends AbstractButterfly {
+	TileState[][] ts= null;
+	Set<Flower> flowers = new HashSet<Flower>();
+
+	/***/
+	public @Override TileState[][] learn() {
+		ts= new TileState[getMapHeight()][getMapWidth()];
+		dfs();
+		return ts;
+	}
+
+
+	/**the Butterfly is on an unvisited, un-refreshed tile
+	 * each visited tile's state updated in TileState array ts
+	 * unreachable tiles are caught in exceptions
+	 * add flowers found to flowers, don't collect
+	 * Butterfly should return to its starting tile */
+	public void dfs(){
+		refreshState();
+		ts[state.location.row][state.location.col]= state; 
+		for(Direction d:Direction.values()){
+			int nextRow= Common.mod(location.row+d.dRow, this.getMapHeight());
+			int nextCol= Common.mod(location.col+d.dCol, this.getMapWidth());
+			if(ts[nextRow][nextCol]==null){
+				try{
+					fly(d, Speed.FAST);
+					for(Flower f: state.getFlowers()){
+						flowers.add(f);
+					}
+					dfs();			
+					fly(Direction.opposite(d), Speed.FAST);
+				}
+				catch(ObstacleCollisionException o){
+					ts[nextRow][nextCol]=TileState.nil;
+				}
+			}
+		}
+	}
+
+	/***/
+	public @Override void run(List<Long> flowerIds) {
+		while(flowerIds.size()>0){
+			refreshState();
+			//oldFlowers(flowerIds);
+			findFlower(maxAroma(flowerIds), flowerIds);
+			//collectFlower(flowerIds);
+			//run(flowerIds);
+		}
+	}
+
+	/**Butterfly finds the shortest path to already learned
+	 * flowers found during learn()*/
+	public void oldFlowers(List<Long> flowerIds){
+		refreshState();
+		for(Direction d: Direction.values()){
+			int nextRow= Common.mod(location.row+d.dRow, this.getMapHeight());
+			int nextCol= Common.mod(location.col+d.dCol, this.getMapWidth());
+			Aroma max= maxAroma(flowerIds);
+			while(ts[nextRow][nextCol]!=TileState.nil){
+				for(Aroma a: ts[nextRow][nextCol].getAromas()){
+					if(a.getFlowerId()==max.getFlowerId()){
+						if(a.intensity>max.intensity){
+							max= a;
+							oldFlowers(flowerIds);
+						}
+					}
+				}
+			}
+			fly(d, Speed.FAST);
+		}
+	}
+
+	//use ts?????
+	/**The butterfly flies to an unrefreshed tile,
+	 * in the direction of the flower with the current 
+	 * strongest aroma*/
+	public void findFlower(Aroma max, List<Long> flowerIds){
+		for(Direction d: Direction.values()){
+			int nextRow= Common.mod(location.row+d.dRow, this.getMapHeight());
+			int nextCol= Common.mod(location.col+d.dCol, this.getMapWidth());
+			if(ts[nextRow][nextCol]!=TileState.nil){
+				fly(d, Speed.FAST);
+				refreshState();
+				for(Aroma a: state.getAromas()){
+					if(a.getFlowerId()==max.getFlowerId()){
+						if(a.intensity>max.intensity){
+							max= a;
+							findFlower(max, flowerIds);
+							collectFlower(flowerIds);
+						}
+						else{
+							fly(Direction.opposite(d), Speed.FAST);
+							refreshState();
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	/**Collects the flower of the aroma that the 
+	 * butterfly is currently searching for, and 
+	 * the corresponding flowerId is removed from the
+	 * list flowerIds*/
+	public void collectFlower(List<Long> flowerIds){
+		for(Flower f: state.getFlowers()){
+			if(flowerIds.contains(f.getFlowerId())){
+				collect(f);
+				flowerIds.remove(f.getFlowerId());
+				refreshState();
+				break;
+			}
+		}
+	}
+
+	/**Returns the maximum aroma associated with the flower
+	 * in the list flowerIds, for the tile that the butterfly
+	 * is currently on.*/
+	public Aroma maxAroma(List<Long> flowerIds){
+		Aroma ar= null;
+		for(Aroma aroma: state.getAromas()){
+			if(flowerIds.contains(aroma.getFlowerId())){
+				if(ar==null){
+					ar=aroma;
+				}
+				if(aroma.intensity>ar.intensity){
+					ar=aroma; 
+				}
+			}
+		}
+		return ar;
+	}
+}
